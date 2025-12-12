@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Contador</title>
+<style>
+body{font-family:Arial;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;padding:20px;margin:0}
+.container{max-width:1200px;margin:0 auto;background:white;border-radius:20px;padding:30px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+h1{color:#333;margin-bottom:20px}
+.btn{padding:12px 24px;border:none;border-radius:8px;cursor:pointer;font-weight:bold;margin:5px}
+.btn-primary{background:#667eea;color:white}
+.btn-success{background:#48bb78;color:white}
+.btn-danger{background:#f56565;color:white}
+.btn-gray{background:#718096;color:white}
+.hidden{display:none!important}
+input,textarea{width:100%;padding:10px;margin:10px 0;border:2px solid #ddd;border-radius:8px}
+textarea{min-height:80px;font-family:monospace}
+.user-card{background:linear-gradient(135deg,#667eea,#764ba2);border-radius:15px;padding:20px;color:white;margin:10px;display:inline-block;min-width:250px;vertical-align:top}
+.counter{font-size:48px;font-weight:bold;text-align:center;background:white;color:#667eea;border-radius:10px;padding:20px;margin:10px 0}
+.alert{padding:15px;border-radius:8px;margin:15px 0}
+.alert-warning{background:#fff3cd;border:2px solid #f39c12}
+.alert-success{background:#d4edda;border:2px solid #28a745}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>📊 Contador por Usuario</h1>
+<button onclick="toggleConfig()" class="btn btn-gray">⚙️ Configurar</button>
+<button id="btnExp" onclick="exportar()" class="btn btn-success hidden">📤 Exportar</button>
+
+<div id="alerta" class="alert alert-warning">⚠️ Configura Google Apps Script</div>
+<div id="estado" class="alert alert-success hidden">✅ Configurado - <span id="auto"></span></div>
+
+<div id="config" class="hidden" style="background:#fff3cd;border:2px solid #f39c12;border-radius:12px;padding:20px;margin:20px 0">
+<h3>Configuración</h3>
+<p><b>1.</b> En Google Sheet: Extensiones → Apps Script</p>
+<p><b>2.</b> Pega este código:</p>
+<textarea readonly onclick="this.select()">function doPost(e){try{var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Contador');if(!s)s=SpreadsheetApp.getActiveSpreadsheet().insertSheet('Contador');var d=e.parameter.data?JSON.parse(e.parameter.data):JSON.parse(e.postData.contents);s.clear();if(d.values&&d.values.length>0){s.getRange(1,1,d.values.length,d.values[0].length).setValues(d.values);s.getRange(1,1,1,d.values[0].length).setFontWeight('bold')}return ContentService.createTextOutput(JSON.stringify({status:'success'})).setMimeType(ContentService.MimeType.JSON)}catch(err){return ContentService.createTextOutput(JSON.stringify({status:'error',message:err.toString()})).setMimeType(ContentService.MimeType.JSON)}}</textarea>
+<p><b>3.</b> Implementar → Nueva implementación → Aplicación web</p>
+<p><b>4.</b> Ejecutar como: Yo | Acceso: Cualquier usuario</p>
+<p><b>5.</b> Copia la URL (termina en /exec):</p>
+<input type="text" id="url" placeholder="https://script.google.com/macros/s/.../exec">
+<label><input type="checkbox" id="autoCheck" checked> Auto-exportar</label><br><br>
+<button onclick="guardarConf()" class="btn btn-primary">💾 Guardar</button>
+</div>
+
+<div style="background:#ebf8ff;padding:20px;border-radius:12px;margin:20px 0">
+<h3>👥 Agregar Usuario</h3>
+<input type="text" id="nombre" placeholder="Nombre..." style="width:60%;display:inline-block">
+<button onclick="agregar()" class="btn btn-primary">➕ Agregar</button>
+</div>
+
+<div id="lista"></div>
+<div id="vacio" style="text-align:center;padding:40px;color:#999">
+<div style="font-size:64px">👥</div>
+<h3>No hay usuarios</h3>
+</div>
+
+<div id="resumen" class="hidden" style="background:#f7fafc;padding:20px;border-radius:12px;margin-top:20px">
+<h3>📈 Resumen</h3>
+<div style="display:inline-block;background:white;padding:20px;border-radius:10px;margin:10px;min-width:150px">
+<div id="totU" style="font-size:32px;font-weight:bold;color:#667eea">0</div>
+<div>Usuarios</div>
+</div>
+<div style="display:inline-block;background:white;padding:20px;border-radius:10px;margin:10px;min-width:150px">
+<div id="totC" style="font-size:32px;font-weight:bold;color:#667eea">0</div>
+<div>Total</div>
+</div>
+</div>
+</div>
+
+<script>
+let u={};
+let cfg={url:'',auto:true};
+
+window.onload=function(){
+try{
+let uu=localStorage.getItem('u');
+if(uu)u=JSON.parse(uu);
+let cc=localStorage.getItem('c');
+if(cc){
+cfg=JSON.parse(cc);
+document.getElementById('url').value=cfg.url;
+document.getElementById('autoCheck').checked=cfg.auto;
+}
+}catch(e){console.error(e)}
+act();
+};
+
+function guardar(){localStorage.setItem('u',JSON.stringify(u))}
+
+function guardarConf(){
+cfg.url=document.getElementById('url').value.trim();
+cfg.auto=document.getElementById('autoCheck').checked;
+localStorage.setItem('c',JSON.stringify(cfg));
+act();
+toggleConfig();
+alert('✅ Guardado');
+}
+
+function toggleConfig(){document.getElementById('config').classList.toggle('hidden')}
+
+function agregar(){
+let n=document.getElementById('nombre').value.trim();
+if(!n){alert('⚠️ Ingresa nombre');return}
+if(u[n]){alert('⚠️ Ya existe');return}
+u[n]={c:0,f:new Date().toISOString()};
+guardar();
+document.getElementById('nombre').value='';
+act();
+console.log('Auto-exportar:', cfg.auto, 'URL:', cfg.url);
+if(cfg.auto && cfg.url){
+console.log('✅ Exportando automáticamente...');
+exportar();
+}
+}
+
+function inc(n){
+u[n].c++;
+u[n].f=new Date().toISOString();
+guardar();
+act();
+console.log('Auto-exportar:', cfg.auto, 'URL:', cfg.url);
+if(cfg.auto && cfg.url){
+console.log('✅ Exportando automáticamente...');
+exportar();
+}
+}
+
+function del(n){
+if(confirm('¿Eliminar '+n+'?')){
+delete u[n];
+guardar();
+act();
+console.log('Auto-exportar:', cfg.auto, 'URL:', cfg.url);
+if(cfg.auto && cfg.url){
+console.log('✅ Exportando automáticamente...');
+exportar();
+}
+}
+}
+
+async function exportar(){
+if(!cfg.url){alert('⚠️ Configura primero');toggleConfig();return}
+try{
+console.log('📤 Exportando...');
+let v=[['Fecha','Usuario','Cantidad','Última'],
+...Object.entries(u).map(([n,d])=>[
+new Date().toLocaleDateString('es-ES'),n,d.c,
+new Date(d.f).toLocaleString('es-ES')
+])];
+let fd=new FormData();
+fd.append('data',JSON.stringify({values:v}));
+await fetch(cfg.url,{method:'POST',body:fd});
+console.log('✅ OK');
+}catch(e){console.error('❌',e)}
+}
+
+function act(){
+let lista=document.getElementById('lista');
+let vacio=document.getElementById('vacio');
+let res=document.getElementById('resumen');
+let alerta=document.getElementById('alerta');
+let estado=document.getElementById('estado');
+let btnExp=document.getElementById('btnExp');
+
+if(cfg.url){
+alerta.classList.add('hidden');
+estado.classList.remove('hidden');
+btnExp.classList.remove('hidden');
+document.getElementById('auto').textContent=cfg.auto?'✓ Exportación automática ACTIVADA':'○ Exportación manual (desactivada)';
+}else{
+alerta.classList.remove('hidden');
+estado.classList.add('hidden');
+btnExp.classList.add('hidden');
+}
+
+let tot=Object.keys(u).length;
+if(tot===0){
+lista.innerHTML='';
+vacio.classList.remove('hidden');
+res.classList.add('hidden');
+}else{
+vacio.classList.add('hidden');
+res.classList.remove('hidden');
+let html='';
+let suma=0;
+for(let [n,d] of Object.entries(u)){
+suma+=d.c;
+let f=new Date(d.f).toLocaleString('es-ES');
+html+=`<div class="user-card">
+<div style="display:flex;justify-content:space-between">
+<strong style="font-size:20px">${n}</strong>
+<button onclick="del('${n}')" class="btn btn-danger" style="padding:5px 10px">🗑️</button>
+</div>
+<div class="counter">${d.c}</div>
+<div style="font-size:11px;margin-bottom:10px">${f}</div>
+<button onclick="inc('${n}')" class="btn btn-primary" style="width:100%">➕ Incrementar</button>
+</div>`;
+}
+lista.innerHTML=html;
+document.getElementById('totU').textContent=tot;
+document.getElementById('totC').textContent=suma;
+}
+}
+</script>
+</body>
+</html>
+```
+
+## 📝 **Instrucciones:**
+
+1. **Abre el Bloc de notas** (Notepad)
+2. **Copia TODO el código de arriba** (desde `<!DOCTYPE html>` hasta `</html>`)
+3. **Pégalo** en el Bloc de notas
+4. **Guardar como:**
+   - Nombre: `contador.html`
+   - Tipo: **"Todos los archivos"** (importante!)
+   - Codificación: UTF-8
+5. **Abre el archivo** con tu navegador
+
+Ahora cuando incrementes un contador, deberías ver en la consola (F12):
+```
+Auto-exportar: true URL: https://script.google.com/...
+✅ Exportando automáticamente...
+📤 Exportando...
+✅ OK
